@@ -169,6 +169,10 @@ protected:
         QLabel *textEditLength;
         LabelButton *sendButton;
         QLabel *sendWaitStatus;
+        /// Clickable label showing the current user's channel points balance.
+        /// Click refreshes the balance. Hidden when showChannelPointBalance is false
+        /// or the channel is not a Twitch channel.
+        QLabel *pointsBalanceLabel;
         SvgButton *emoteButton;
     } ui_;
 
