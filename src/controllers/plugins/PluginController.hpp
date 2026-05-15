@@ -19,6 +19,8 @@
 #    include <sol/forward.hpp>
 
 #    include <map>
+
+class QMenu;
 #    include <memory>
 #    include <utility>
 
@@ -65,6 +67,15 @@ public:
     std::pair<bool, QStringList> updateCustomCompletions(
         const QString &query, const QString &fullTextContent,
         int cursorPosition, bool isFirstWord) const;
+
+    /**
+     * Lets all enabled plugins add items to a message right-click context menu.
+     * Called from ChannelView::addContextMenuItems.
+     */
+    void addPluginContextMenuItems(QMenu *menu, const QString &msgId,
+                                   const QString &msgText,
+                                   const QString &loginName,
+                                   const QString &channelName);
 
     WebSocketPool &webSocketPool();
 
