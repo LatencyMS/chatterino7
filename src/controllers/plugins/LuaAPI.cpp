@@ -259,6 +259,15 @@ void package_loadlib(sol::variadic_args args)
     throw std::runtime_error("package.loadlib: this function is a stub!");
 }
 
+void c2_register_context_menu_item(ThisPluginState L, const QString &label,
+                                    sol::protected_function callback)
+{
+    Plugin::ContextMenuItem item;
+    item.label = label;
+    item.callback = std::move(callback);
+    L.plugin()->contextMenuItems.push_back(std::move(item));
+}
+
 }  // namespace chatterino::lua::api
 // NOLINTEND(*vararg)
 #endif
