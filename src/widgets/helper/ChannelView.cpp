@@ -5,6 +5,9 @@
 #include "widgets/helper/ChannelView.hpp"
 
 #include "Application.hpp"
+#ifdef CHATTERINO_HAVE_PLUGINS
+#    include "controllers/plugins/PluginController.hpp"
+#endif
 #include "common/Common.hpp"
 #include "common/QLogging.hpp"
 #include "controllers/accounts/AccountController.hpp"
@@ -2676,6 +2679,17 @@ void ChannelView::addContextMenuItems(
 
     // Add executable command options
     this->addCommandExecutionContextMenuItems(menu, layout);
+
+#ifdef CHATTERINO_HAVE_PLUGINS
+    // Let plugins add their own context menu items
+    if (auto *pc = getApp()->getPlugins())
+    {
+        const auto &msg      = layout->getMessage();
+        QString chanName     = this->underlyingChannel_->getName();
+        pc->addPluginContextMenuItems(menu, msg->id, msg->messageText,
+                                      msg->loginName, chanName);
+    }
+#endif
 
     menu->popup(QCursor::pos());
     menu->raise();
