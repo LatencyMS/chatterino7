@@ -789,6 +789,9 @@ public:
 
     BoolSetting showSendButton = {"/ui/showSendButton", false};
 
+    /// Whether to show the channel points balance label next to the chat input
+    BoolSetting showChannelPointBalance = {"/ui/showChannelPointBalance", true};
+
     struct {
         // this isn't shown in the UI
         BoolSetting enabled = {"/plugins/repl/enabled", false};
