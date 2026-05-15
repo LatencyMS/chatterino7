@@ -45,6 +45,7 @@
 #    include <sol/variadic_results.hpp>
 
 #    include <memory>
+#    include <QMenu>
 #    include <utility>
 #    include <variant>
 
@@ -243,6 +244,8 @@ void PluginController::initSol(sol::state_view &lua, Plugin *plugin)
                         return plugin->registerCommand(name, std::move(cb));
                     });
     c2.set_function("register_callback", &lua::api::c2_register_callback);
+    c2.set_function("register_context_menu_item",
+                    &lua::api::c2_register_context_menu_item);
     c2.set_function("log", &lua::api::c2_log);
     c2.set_function("later", &lua::api::c2_later);
 
@@ -488,6 +491,61 @@ std::pair<bool, QStringList> PluginController::updateCustomCompletions(
 WebSocketPool &PluginController::webSocketPool()
 {
     return this->webSocketPool_;
+}
+
+void PluginController::addPluginContextMenuItems(QMenu *menu,
+                                                  const QString &msgId,
+                                                  const QString &msgText,
+                                                  const QString &loginName,
+                                                  const QString &channelName)
+{
+    for (auto &[id, plugin] : this->plugins_)
+    {
+        if (!plugin || !plugin->error().isNull())
+        {
+            continue;
+        }
+
+        for (auto &item : plugin->contextMenuItems)
+        {
+            if (!item.callback.valid())
+            {
+                continue;
+            }
+
+            // Capture everything by value so the lambda owns it
+            QString label      = item.label;
+            auto cb            = item.callback;
+            sol::state_view sv = plugin->state();
+            QString capMsgId   = msgId;
+            QString capText    = msgText;
+            QString capLogin   = loginName;
+            QString capChan    = channelName;
+
+            auto *action = menu->addAction(label);
+
+            QObject::connect(action, &QAction::triggered,
+                             [cb, sv, capMsgId, capText, capLogin,
+                              capChan]() mutable {
+                                 sol::table t = sv.create_table_with(
+                                     "id", capMsgId,          //
+                                     "text", capText,          //
+                                     "login_name", capLogin,   //
+                                     "channel_name", capChan   //
+                                 );
+
+                                 auto res = cb(t);
+                                 if (!res.valid())
+                                 {
+                                     sol::error err = res;
+                                     qCWarning(chatterinoLua)
+                                         << "Plugin context menu callback "
+                                            "error:"
+                                         << err.what();
+                                 }
+                             });
+        }
+    }
 }
 
 }  // namespace chatterino
