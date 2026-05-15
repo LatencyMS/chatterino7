@@ -338,6 +338,9 @@ public:
 
     pajlada::Signals::NoArgSignal destroyed;
 
+    /// Emitted (on the main thread) when the channel points balance is updated.
+    pajlada::Signals::Signal<int> channelPointBalanceChanged;
+
     pajlada::Signals::Signal<const QString &> sendWaitUpdate;
 
     // Channel point rewards
@@ -407,6 +410,16 @@ private:
     };
 
     void refreshPubSub();
+
+    /**
+     * @brief Fetch the current user's channel points balance for this channel via GQL.
+     * Emits channelPointBalanceChanged when the result arrives.
+     * Safe to call from any thread.
+     */
+    void fetchChannelPointBalance();
+
+    /// Returns the last known channel points balance, or -1 if unknown.
+    int channelPointBalance() const;
     void refreshChatters();
     void refreshBadges();
     void refreshCheerEmotes();
@@ -573,6 +586,9 @@ private:
     std::vector<QString> lastLiveUpdateEmoteNames_;
 
     pajlada::Signals::SignalHolder signalHolder_;
+
+    // Channel points balance for the current user; -1 = unknown
+    std::atomic<int> channelPointBalance_{-1};
     std::vector<boost::signals2::scoped_connection> bSignals_;
 
     eventsub::SubscriptionHandle eventSubChannelModerateHandle;
