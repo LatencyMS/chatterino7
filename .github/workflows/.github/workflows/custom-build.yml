@@ -1,11 +1,11 @@
 name: Build Custom Technorino
 
 on:
-  workflow_dispatch:   # run manually from the Actions tab
+  workflow_dispatch:
 
 jobs:
   build-windows:
-    runs-on: windows-latest
+    runs-on: windows-2022
 
     steps:
       - name: Checkout
@@ -13,6 +13,11 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 0
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: amd64
 
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
@@ -26,25 +31,27 @@ jobs:
             qt5compat
           cache: true
 
-      - name: Setup MSVC
-        uses: ilammy/msvc-dev-cmd@v1
+      - name: Install Boost
+        uses: MarkusJx/install-boost@v2.4.5
+        id: install-boost
         with:
-          arch: amd64
+          boost_version: "1.85.0"
+          platform_version: "2022"
+          toolset: msvc
 
-      - name: Cache build
-        uses: actions/cache@v4
-        with:
-          path: build
-          key: windows-build-${{ hashFiles('CMakeLists.txt') }}
-          restore-keys: windows-build-
+      - name: Install OpenSSL
+        run: choco install openssl --no-progress -y
 
       - name: Configure CMake
+        env:
+          BOOST_ROOT: ${{ steps.install-boost.outputs.BOOST_ROOT }}
         run: |
           cmake -B build -S . `
             -DCMAKE_BUILD_TYPE=Release `
             -DCHATTERINO_PLUGINS=ON `
             -DBUILD_WITH_QTKEYCHAIN=OFF `
             -DCHATTERINO_LTO=OFF `
+            -DBOOST_ROOT="${{ steps.install-boost.outputs.BOOST_ROOT }}" `
             -G "Ninja"
 
       - name: Build
