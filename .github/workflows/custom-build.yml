@@ -1,0 +1,64 @@
+name: Build Custom Technorino
+
+on:
+  workflow_dispatch:   # run manually from the Actions tab
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.9.3"
+          host: windows
+          target: desktop
+          arch: win64_msvc2022_64
+          modules: >-
+            qtimageformats
+            qt5compat
+          cache: true
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: amd64
+
+      - name: Cache build
+        uses: actions/cache@v4
+        with:
+          path: build
+          key: windows-build-${{ hashFiles('CMakeLists.txt') }}
+          restore-keys: windows-build-
+
+      - name: Configure CMake
+        run: |
+          cmake -B build -S . `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DCHATTERINO_PLUGINS=ON `
+            -DBUILD_WITH_QTKEYCHAIN=OFF `
+            -DCHATTERINO_LTO=OFF `
+            -G "Ninja"
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Collect dependencies
+        run: |
+          mkdir artifact
+          copy build\chatterino.exe artifact\
+          windeployqt --release --no-translations artifact\chatterino.exe
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Technorino-Custom-Windows
+          path: artifact\
+          retention-days: 30
