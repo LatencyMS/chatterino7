@@ -124,6 +124,13 @@ public:
 
     std::map<lua::api::EventType, sol::protected_function> callbacks;
 
+    // Items registered via c2.register_context_menu_item()
+    struct ContextMenuItem {
+        QString label;
+        sol::protected_function callback;
+    };
+    std::vector<ContextMenuItem> contextMenuItems;
+
     // In-flight HTTP Requests
     // This is a lifetime hack to ensure they get deleted with the plugin. This relies on the Plugin getting deleted on reload!
     std::vector<std::shared_ptr<lua::api::HTTPRequest>> httpRequests;
