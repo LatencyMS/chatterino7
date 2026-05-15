@@ -205,6 +205,21 @@ void SplitInput::initLayout()
         },
         this->managedConnections_);
 
+    // Show/hide balance label based on setting
+    getSettings()->showChannelPointBalance.connect(
+        [this](const bool value, auto) {
+            // Only show if we actually have a balance to display
+            if (value && !this->ui_.pointsBalanceLabel->text().isEmpty())
+            {
+                this->ui_.pointsBalanceLabel->show();
+            }
+            else
+            {
+                this->ui_.pointsBalanceLabel->hide();
+            }
+        },
+        this->managedConnections_);
+
     // right box
     auto box = hboxLayout.emplace<QVBoxLayout>().withoutMargin();
     box->setSpacing(0);
@@ -219,6 +234,17 @@ void SplitInput::initLayout()
         this->ui_.sendWaitStatus->setAlignment(Qt::AlignRight);
         this->ui_.sendWaitStatus->setHidden(true);
         hbox->addWidget(this->ui_.sendWaitStatus);
+
+        // Channel points balance label
+        this->ui_.pointsBalanceLabel = new QLabel();
+        this->ui_.pointsBalanceLabel->setAlignment(Qt::AlignRight |
+                                                    Qt::AlignVCenter);
+        this->ui_.pointsBalanceLabel->setToolTip(
+            "Channel points balance\nClick to refresh");
+        this->ui_.pointsBalanceLabel->setCursor(Qt::PointingHandCursor);
+        this->ui_.pointsBalanceLabel->setHidden(true);
+        this->ui_.pointsBalanceLabel->installEventFilter(this);
+        hbox->addWidget(this->ui_.pointsBalanceLabel);
 
         this->ui_.emoteButton = new SvgButton(
             {
@@ -742,6 +768,18 @@ void SplitInput::addShortcuts()
 
 bool SplitInput::eventFilter(QObject *obj, QEvent *event)
 {
+    // Click on channel points balance label → refresh balance
+    if (obj == this->ui_.pointsBalanceLabel &&
+        event->type() == QEvent::MouseButtonRelease)
+    {
+        auto channel = this->split_->getSelectedChannel();
+        if (auto *tc = dynamic_cast<TwitchChannel *>(channel.get()))
+        {
+            tc->fetchChannelPointBalance();
+        }
+        return true;
+    }
+
     if (event->type() == QEvent::ShortcutOverride ||
         event->type() == QEvent::Shortcut)
     {
@@ -1529,6 +1567,10 @@ void SplitInput::updateChannel()
 {
     this->channelConnections_.clear();
 
+    // Disconnect from old channel's balance signal and hide label
+    this->ui_.pointsBalanceLabel->hide();
+    this->ui_.pointsBalanceLabel->setText("");
+
     auto channel = this->split_->getChannel();
     if (auto *multiChannel = dynamic_cast<MultiChannel *>(channel.get()))
     {
@@ -1544,6 +1586,38 @@ void SplitInput::updateChannel()
     auto selected = this->split_->getSelectedChannel();
     this->ui_.textEdit->setCompleter(new QCompleter(selected->completionModel));
     this->inputHighlighter->setChannel(selected);
+
+    // Connect channel points balance if this is a Twitch channel
+    if (auto *tc = dynamic_cast<TwitchChannel *>(selected.get()))
+    {
+        this->channelConnections_.managedConnect(
+            tc->channelPointBalanceChanged, [this](int balance) {
+                auto text =
+                    QString("\u2B50 %1").arg(QLocale().toString(balance));
+                this->ui_.pointsBalanceLabel->setText(text);
+                if (getSettings()->showChannelPointBalance)
+                {
+                    this->ui_.pointsBalanceLabel->show();
+                }
+            });
+
+        // Fetch balance immediately if we already have one cached,
+        // otherwise request a fresh one
+        int cached = tc->channelPointBalance();
+        if (cached >= 0)
+        {
+            auto text = QString("\u2B50 %1").arg(QLocale().toString(cached));
+            this->ui_.pointsBalanceLabel->setText(text);
+            if (getSettings()->showChannelPointBalance)
+            {
+                this->ui_.pointsBalanceLabel->show();
+            }
+        }
+        else
+        {
+            tc->fetchChannelPointBalance();
+        }
+    }
 }
 
 }  // namespace chatterino
