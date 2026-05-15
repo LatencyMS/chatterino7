@@ -9,6 +9,7 @@
 #include "common/Env.hpp"
 #include "common/Literals.hpp"
 #include "common/network/NetworkRequest.hpp"
+#include "common/network/NetworkRequestType.hpp" 
 #include "common/network/NetworkResult.hpp"
 #include "common/QLogging.hpp"
 #include "controllers/accounts/AccountController.hpp"
@@ -1582,6 +1583,9 @@ void TwitchChannel::refreshPubSub()
 
     getApp()->getTwitchPubSub()->listenToChannelPointRewards(roomId);
 
+    // Fetch initial channel point balance asynchronously
+    this->fetchChannelPointBalance();
+
     if (currentAccount->isAnon())
     {
         this->eventSubChannelModerateHandle.reset();
@@ -2401,6 +2405,97 @@ void TwitchChannel::setSendWait(int seconds)
 bool TwitchChannel::isLoadingRecentMessages() const
 {
     return this->loadingRecentMessages_.test();
+}
+
+int TwitchChannel::channelPointBalance() const
+{
+    return this->channelPointBalance_.load();
+}
+
+void TwitchChannel::fetchChannelPointBalance()
+{
+    if (getApp()->isTest())
+    {
+        return;
+    }
+
+    auto currentAccount = getApp()->getAccounts()->twitch.getCurrent();
+    if (!currentAccount || currentAccount->isAnon())
+    {
+        return;
+    }
+
+    auto login = this->getName();
+    if (login.isEmpty())
+    {
+        return;
+    }
+
+    // GQL ChannelPointsContext persisted query — returns the current user's
+    // channel points balance for the given channel login.
+    // NOTE: If getOAuthToken() doesn't compile, check TwitchAccount.hpp for the
+    //       correct method name (may be oauthToken_ or similar).
+    QString oauthToken = currentAccount->getOAuthToken();
+    if (oauthToken.isEmpty())
+    {
+        return;
+    }
+
+    // Escape login name for JSON safety
+    QString safeLogin = login;
+    safeLogin.replace("\\", "\\\\").replace(""", "\\"");
+
+    QString payload = QStringLiteral(
+        R"([{"operationName":"ChannelPointsContext","variables":{"channelLogin":"%1","includeGoalTypes":["CREATOR"]},"extensions":{"persistedQuery":{"version":1,"sha256Hash":"374314de591e69925fce3ddc2bcf085796f56ebb8cad67a0daa3165c03adc345"}}}])"
+    ).arg(safeLogin);
+
+    NetworkRequest("https://gql.twitch.tv/gql", NetworkRequestType::Post)
+        .header("Client-ID", "kimne78kx3ncx6brgo4mv6wki5h1ko")
+        .header("Authorization", "OAuth " + oauthToken)
+        .header("Content-Type", "application/json")
+        .payload(payload.toUtf8())
+        .onSuccess([chan = weakOf<Channel>(this)](NetworkResult result) {
+            auto self =
+                std::dynamic_pointer_cast<TwitchChannel>(chan.lock());
+            if (!self)
+            {
+                return;
+            }
+
+            auto doc = result.parseJson();
+            if (doc.isNull() || !doc.isArray())
+            {
+                return;
+            }
+
+            auto arr  = doc.array();
+            if (arr.isEmpty())
+            {
+                return;
+            }
+
+            // Navigate: [0].data.community.channel.self.communityPoints.balance
+            auto balance =
+                arr.first()
+                    .toObject()["data"]
+                    .toObject()["community"]
+                    .toObject()["channel"]
+                    .toObject()["self"]
+                    .toObject()["communityPoints"]
+                    .toObject()["balance"]
+                    .toInt(-1);
+
+            if (balance < 0)
+            {
+                return;
+            }
+
+            self->channelPointBalance_.store(balance);
+            postToThread([self, balance] {
+                self->channelPointBalanceChanged(balance);
+            });
+        })
+        .execute();
 }
 
 }  // namespace chatterino
