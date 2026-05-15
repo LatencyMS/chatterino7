@@ -141,6 +141,17 @@ void c2_log(ThisPluginState L, LogLevel lvl, sol::variadic_args args);
  */
 void c2_later(ThisPluginState L, sol::protected_function callback, int time);
 
+/**
+ * Registers a right-click context menu item visible on all chat messages.
+ * The callback receives a table: { id, text, login_name, channel_name }
+ *
+ * @lua@param label string The text shown in the context menu.
+ * @lua@param callback fun(msg: {id:string, text:string, login_name:string, channel_name:string})
+ * @exposed c2.register_context_menu_item
+ */
+void c2_register_context_menu_item(ThisPluginState L, const QString &label,
+                                    sol::protected_function callback);
+
 // These ones are global
 sol::variadic_results g_load(ThisPluginState s, sol::object data);
 void g_print(ThisPluginState L, sol::variadic_args args);
