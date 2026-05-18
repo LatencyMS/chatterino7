@@ -3,9 +3,12 @@ name: Build Custom Technorino
 on:
   workflow_dispatch:
 
+env:
+  CONAN_VERSION: 2.28.1
+
 jobs:
   build-windows:
-    runs-on: windows-2022
+    runs-on: windows-latest
 
     steps:
       - name: Checkout
@@ -14,73 +17,82 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
-      - name: Setup MSVC
-        uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: amd64
-
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
         with:
-          version: "6.9.3"
-          host: windows
-          target: desktop
-          arch: win64_msvc2022_64
-          modules: >-
-            qtimageformats
-            qt5compat
           cache: true
+          cache-key-prefix: Windows-QtCache-6.9.3-v2
+          modules: qtimageformats
+          version: "6.9.3"
 
-      - name: Install Conan
-        run: pip install "conan==2.*"
-
-      - name: Setup Conan profile
-        run: conan profile detect --force
+      - name: Enable Developer Command Prompt
+        uses: Chatterino/msvc-dev-cmd@v2.0.5
+        with:
+          arch: x64
 
       - name: Cache Conan packages
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
-          path: ~/.conan2
-          key: conan-windows-msvc-${{ hashFiles('conanfile.py', 'conanfile.txt') }}
-          restore-keys: conan-windows-msvc-
+          key: Windows-x64-conan-user-${{ hashFiles('**/conanfile.py') }}-QT6
+          path: ~/.conan2/
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install Conan
+        run: |
+          pip install conan==${{ env.CONAN_VERSION }}
+          conan --version
+          conan profile detect -f
+        shell: bash
 
       - name: Install dependencies via Conan
-        shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path build
-          Push-Location build
-          conan install .. `
-            -s build_type=Release `
-            -s compiler.cppstd=20 `
-            --build=missing `
-            --output-folder=.
-          Pop-Location
-
-      - name: Configure CMake
-        shell: pwsh
-        run: |
-          cmake -B build -S . `
-            -DCMAKE_BUILD_TYPE=Release `
-            -DCMAKE_TOOLCHAIN_FILE="build/conan_toolchain.cmake" `
-            -DCHATTERINO_PLUGINS=ON `
-            -DBUILD_WITH_QTKEYCHAIN=OFF `
-            -DCHATTERINO_LTO=OFF `
-            -G "Ninja"
+          mkdir build
+          cd build
+          conan install .. \
+            -s build_type=RelWithDebInfo \
+            -c tools.cmake.cmaketoolchain:generator="Ninja" \
+            -b missing \
+            --output-folder=. \
+            -o with_openssl3=True
+          conan cache clean --source --build --download "*"
+        shell: bash
 
       - name: Build
-        run: cmake --build build --config Release --parallel
-
-      - name: Collect dependencies
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path artifact
-          $exe = Get-ChildItem -Recurse build -Filter chatterino.exe | Select-Object -First 1
-          Copy-Item $exe.FullName artifact\chatterino.exe
-          windeployqt --release --no-translations artifact\chatterino.exe
+          cd build
+          cmake `
+            -G Ninja `
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo `
+            -DCMAKE_TOOLCHAIN_FILE="conan_toolchain.cmake" `
+            -DUSE_PRECOMPILED_HEADERS=ON `
+            -DCHATTERINO_LTO=OFF `
+            -DCHATTERINO_PLUGINS=ON `
+            -DBUILD_WITH_QTKEYCHAIN=OFF `
+            -DFORCE_JSON_GENERATION=Off `
+            ..
+          ninja
+
+      - name: Package
+        shell: pwsh
+        working-directory: build
+        run: |
+          windeployqt bin/chatterino.exe --release --no-compiler-runtime --no-translations --no-opengl-sw --dir Chatterino2/ --force-openssl
+          cp bin/chatterino.exe Chatterino2/
+
+      - name: Zip artifact
+        shell: pwsh
+        working-directory: build
+        run: |
+          7z a Technorino-Custom-Windows.zip Chatterino2/
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: Technorino-Custom-Windows
-          path: artifact\
+          path: build/Technorino-Custom-Windows.zip
           retention-days: 30
