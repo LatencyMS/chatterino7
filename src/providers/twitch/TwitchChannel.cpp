@@ -2487,14 +2487,11 @@ void TwitchChannel::fetchChannelPointBalance()
             {
                 return;
             }
-
-            self->channelPointBalance_.store(balance);
-            int bal = balance;
-postToThread([self, bal] {
-    self->channelPointBalanceChanged(bal);
-                self->channelPointBalanceChanged(balance);
+self->channelPointBalance_.store(balance);
+            postToThread([self] {
+                self->channelPointBalanceChanged(
+                    self->channelPointBalance_.load());
             });
-        })
         .execute();
 }
 
