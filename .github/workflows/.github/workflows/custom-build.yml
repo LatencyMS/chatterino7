@@ -33,7 +33,7 @@ jobs:
       - name: Cache Conan packages
         uses: actions/cache@v5
         with:
-          key: Windows-x64-conan-user-${{ hashFiles('**/conanfile.py') }}-QT6
+          key: Windows-x64-conan-${{ hashFiles('**/conanfile.py') }}-QT6
           path: ~/.conan2/
 
       - name: Setup Python
@@ -42,52 +42,64 @@ jobs:
           python-version: "3.13"
 
       - name: Install Conan
+        shell: bash
         run: |
           pip install conan==${{ env.CONAN_VERSION }}
-          conan --version
           conan profile detect -f
-        shell: bash
+
+      - name: Create build directory
+        shell: pwsh
+        run: New-Item -ItemType Directory -Force -Path build
 
       - name: Install dependencies via Conan
+        shell: bash
+        working-directory: build
         run: |
-          mkdir build
-          cd build
           conan install .. \
             -s build_type=RelWithDebInfo \
             -c tools.cmake.cmaketoolchain:generator="Ninja" \
             -b missing \
             --output-folder=. \
             -o with_openssl3=True
-          conan cache clean --source --build --download "*"
-        shell: bash
 
-      - name: Build
+      - name: Verify Conan output
         shell: pwsh
         run: |
-          cd build
-          cmake `
-            -G Ninja `
+          if (Test-Path "build/conan_toolchain.cmake") {
+            Write-Host "SUCCESS: conan_toolchain.cmake found"
+          } else {
+            Write-Host "FAILURE: conan_toolchain.cmake not found!"
+            Get-ChildItem build/ | Select-Object Name
+            exit 1
+          }
+
+      - name: Configure CMake
+        shell: pwsh
+        working-directory: build
+        run: |
+          $toolchain = (Resolve-Path "conan_toolchain.cmake").Path
+          Write-Host "Using toolchain: $toolchain"
+          cmake -G Ninja `
             -DCMAKE_BUILD_TYPE=RelWithDebInfo `
-            -DCMAKE_TOOLCHAIN_FILE="conan_toolchain.cmake" `
+            "-DCMAKE_TOOLCHAIN_FILE=$toolchain" `
             -DUSE_PRECOMPILED_HEADERS=ON `
             -DCHATTERINO_LTO=OFF `
             -DCHATTERINO_PLUGINS=ON `
             -DBUILD_WITH_QTKEYCHAIN=OFF `
             -DFORCE_JSON_GENERATION=Off `
             ..
-          ninja
+
+      - name: Compile
+        shell: pwsh
+        working-directory: build
+        run: ninja
 
       - name: Package
         shell: pwsh
         working-directory: build
         run: |
           windeployqt bin/chatterino.exe --release --no-compiler-runtime --no-translations --no-opengl-sw --dir Chatterino2/ --force-openssl
-          cp bin/chatterino.exe Chatterino2/
-
-      - name: Zip artifact
-        shell: pwsh
-        working-directory: build
-        run: |
+          Copy-Item bin/chatterino.exe Chatterino2/
           7z a Technorino-Custom-Windows.zip Chatterino2/
 
       - name: Upload artifact
