@@ -2460,13 +2460,13 @@ void TwitchChannel::fetchChannelPointBalance()
                 return;
             }
 
-            auto doc = result.parseJson();
+            auto doc = QJsonDocument::fromJson(result.getData());
             if (doc.isNull() || !doc.isArray())
             {
                 return;
             }
 
-            auto arr  = doc.array();
+            auto arr = doc.array();
             if (arr.isEmpty())
             {
                 return;
@@ -2489,7 +2489,9 @@ void TwitchChannel::fetchChannelPointBalance()
             }
 
             self->channelPointBalance_.store(balance);
-            postToThread([self, balance] {
+            int bal = balance;
+postToThread([self, bal] {
+    self->channelPointBalanceChanged(bal);
                 self->channelPointBalanceChanged(balance);
             });
         })
