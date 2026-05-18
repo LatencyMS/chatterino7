@@ -2442,7 +2442,6 @@ void TwitchChannel::fetchChannelPointBalance()
 
     // Escape login name for JSON safety
     QString safeLogin = login;
-    safeLogin.replace("\\", "\\\\").replace(""", "\\"");
 
     QString payload = QStringLiteral(
         R"([{"operationName":"ChannelPointsContext","variables":{"channelLogin":"%1","includeGoalTypes":["CREATOR"]},"extensions":{"persistedQuery":{"version":1,"sha256Hash":"374314de591e69925fce3ddc2bcf085796f56ebb8cad67a0daa3165c03adc345"}}}])"
