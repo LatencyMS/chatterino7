@@ -9,7 +9,6 @@
 #include "common/Env.hpp"
 #include "common/Literals.hpp"
 #include "common/network/NetworkRequest.hpp"
-#include "common/network/NetworkRequestType.hpp" 
 #include "common/network/NetworkResult.hpp"
 #include "common/QLogging.hpp"
 #include "controllers/accounts/AccountController.hpp"
