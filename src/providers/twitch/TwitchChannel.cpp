@@ -2430,22 +2430,17 @@ void TwitchChannel::fetchChannelPointBalance()
         return;
     }
 
-    // GQL ChannelPointsContext persisted query — returns the current user's
-    // channel points balance for the given channel login.
-    // NOTE: If getOAuthToken() doesn't compile, check TwitchAccount.hpp for the
-    //       correct method name (may be oauthToken_ or similar).
-    QString oauthToken = currentAccount->getOAuthToken();
+    auto oauthToken = currentAccount->getOAuthToken();
     if (oauthToken.isEmpty())
     {
         return;
     }
 
-    // Escape login name for JSON safety
-    QString safeLogin = login;
-
-    QString payload = QStringLiteral(
-        R"([{"operationName":"ChannelPointsContext","variables":{"channelLogin":"%1","includeGoalTypes":["CREATOR"]},"extensions":{"persistedQuery":{"version":1,"sha256Hash":"374314de591e69925fce3ddc2bcf085796f56ebb8cad67a0daa3165c03adc345"}}}])"
-    ).arg(safeLogin);
+    // Twitch channel logins are [a-zA-Z0-9_] — no JSON escaping needed
+    auto payload =
+        QStringLiteral(
+            R"([{"operationName":"ChannelPointsContext","variables":{"channelLogin":"%1","includeGoalTypes":["CREATOR"]},"extensions":{"persistedQuery":{"version":1,"sha256Hash":"374314de591e69925fce3ddc2bcf085796f56ebb8cad67a0daa3165c03adc345"}}}])")
+            .arg(login);
 
     NetworkRequest("https://gql.twitch.tv/gql", NetworkRequestType::Post)
         .header("Client-ID", "kimne78kx3ncx6brgo4mv6wki5h1ko")
@@ -2473,25 +2468,26 @@ void TwitchChannel::fetchChannelPointBalance()
             }
 
             // Navigate: [0].data.community.channel.self.communityPoints.balance
-            auto balance =
-                arr.first()
-                    .toObject()["data"]
-                    .toObject()["community"]
-                    .toObject()["channel"]
-                    .toObject()["self"]
-                    .toObject()["communityPoints"]
-                    .toObject()["balance"]
-                    .toInt(-1);
+            auto balance = arr.first()
+                               .toObject()[QStringLiteral("data")]
+                               .toObject()[QStringLiteral("community")]
+                               .toObject()[QStringLiteral("channel")]
+                               .toObject()[QStringLiteral("self")]
+                               .toObject()[QStringLiteral("communityPoints")]
+                               .toObject()[QStringLiteral("balance")]
+                               .toInt(-1);
 
             if (balance < 0)
             {
                 return;
             }
-self->channelPointBalance_.store(balance);
+
+            self->channelPointBalance_.store(balance);
             postToThread([self] {
-                self->channelPointBalanceChanged(
-                    self->channelPointBalance_.load());
+                int b = self->channelPointBalance_.load();
+                self->channelPointBalanceChanged(b);
             });
+        })
         .execute();
 }
 
