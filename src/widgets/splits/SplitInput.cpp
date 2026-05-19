@@ -238,7 +238,7 @@ void SplitInput::initLayout()
         // Channel points balance label
         this->ui_.pointsBalanceLabel = new QLabel();
         this->ui_.pointsBalanceLabel->setAlignment(Qt::AlignRight |
-                                                    Qt::AlignVCenter);
+                                                   Qt::AlignVCenter);
         this->ui_.pointsBalanceLabel->setToolTip(
             "Channel points balance\nClick to refresh");
         this->ui_.pointsBalanceLabel->setCursor(Qt::PointingHandCursor);
@@ -1568,8 +1568,11 @@ void SplitInput::updateChannel()
     this->channelConnections_.clear();
 
     // Disconnect from old channel's balance signal and hide label
-    this->ui_.pointsBalanceLabel->hide();
-    this->ui_.pointsBalanceLabel->setText("");
+    if (this->ui_.pointsBalanceLabel)
+    {
+        this->ui_.pointsBalanceLabel->hide();
+        this->ui_.pointsBalanceLabel->setText("");
+    }
 
     auto channel = this->split_->getChannel();
     if (auto *multiChannel = dynamic_cast<MultiChannel *>(channel.get()))
@@ -1592,6 +1595,7 @@ void SplitInput::updateChannel()
     {
         this->channelConnections_.managedConnect(
             tc->channelPointBalanceChanged, [this](int balance) {
+                if (!this->ui_.pointsBalanceLabel) return;
                 auto text =
                     QString("\u2B50 %1").arg(QLocale().toString(balance));
                 this->ui_.pointsBalanceLabel->setText(text);
