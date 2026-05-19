@@ -387,6 +387,8 @@ public:
     void setSendWait(int seconds);
 
     bool isLoadingRecentMessages() const;
+    void fetchChannelPointBalance();
+    int channelPointBalance() const;
 
 private:
     struct NameOptions {
@@ -410,9 +412,6 @@ private:
     };
 
     void refreshPubSub();
-    void fetchChannelPointBalance();
-    int channelPointBalance() const;
-
     /**
      * @brief Fetch the current user's channel points balance for this channel via GQL.
      * Emits channelPointBalanceChanged when the result arrives.
