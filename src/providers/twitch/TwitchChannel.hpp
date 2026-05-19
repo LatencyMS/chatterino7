@@ -410,16 +410,15 @@ private:
     };
 
     void refreshPubSub();
+    void fetchChannelPointBalance();
+    int channelPointBalance() const;
 
     /**
      * @brief Fetch the current user's channel points balance for this channel via GQL.
      * Emits channelPointBalanceChanged when the result arrives.
      * Safe to call from any thread.
      */
-    void fetchChannelPointBalance();
 
-    /// Returns the last known channel points balance, or -1 if unknown.
-    int channelPointBalance() const;
     void refreshChatters();
     void refreshBadges();
     void refreshCheerEmotes();
