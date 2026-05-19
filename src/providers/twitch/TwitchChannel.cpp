@@ -2485,7 +2485,7 @@ void TwitchChannel::fetchChannelPointBalance()
             self->channelPointBalance_.store(balance);
             postToThread([self] {
                 int b = self->channelPointBalance_.load();
-                self->channelPointBalanceChanged(b);
+                self->channelPointBalanceChanged.invoke(b);
             });
         })
         .execute();
